@@ -5,55 +5,37 @@ bf16: false
 tf32: false
 
 # Dataset arguments
-dataset_id_or_path: 'openai/gsm8k'  # Using Hugging Face ID for portability
+dataset_id_or_path: 'openai/gsm8k'
 
-# Training arguments (Optimized for CPU & Stability)
-max_steps: 30
-gradient_accumulation_steps: 1
+# Training arguments
+max_steps: 30 # Original 450
+gradient_accumulation_steps: 4
 gradient_checkpointing: false
 gradient_checkpointing_kwargs:
   use_reentrant: false
-learning_rate: 1.2e-6
+learning_rate: 5.0e-7 # 1.0e-6 as in the deepseek math paper 5-e7 from https://hijkzzz.notion.site/unraveling-rlhf-and-its-variants-engineering-insights#147d9a33ecc9806090f3d5c749d31f05
 lr_scheduler_type: cosine
-warmup_steps: 10
-output_dir: "./output/"
-overwrite_output_dir: true
+warmup_ratio: 0.03
 
-# Evaluation arguments
+# GRPO arguments
 use_vllm: false
-n_shot: 1
-max_prompt_batch_size: 2
-reward_fn: dpo
+num_generations: 2
+per_device_train_batch_size: 2
+beta: 0.001 # 0.04 as in the deepseek math paper 0.001 from https://hijkzzz.notion.site/unraveling-rlhf-and-its-variants-engineering-insights#147d9a33ecc9806090f3d5c749d31f05
 max_prompt_length: 256
 max_completion_length: 1024
 
-# CPU-specific optimizations
-num_workers: 4
-ddp_enabled: true
-torch_distributed_backend: "gloo"
-torch_num_threads: 8
-torch_intraop_threads: 8
-torch_interop_threads: 2
-pin_memory: false
-non_blocking: false
-persistent_workers: true
-prefetch_factor: 4
-torch_use_deterministic_algorithms: false
-torch_use_cpu_affinity: true
-
 # Logging arguments
 logging_strategy: steps
-logging_steps: 10
-logging_dir: "./logs/"
+logging_steps: 2
 report_to:
-  - tensorboard
+- tensorboard
 save_strategy: "steps"
-save_steps: 20
+save_steps: 25
 seed: 42
 
 # Script arguments
 max_rounds: 10000
-push_timeout: 300
 
 # Model-specific arguments
 model_name_or_path: unsloth/Qwen2.5-0.5B-Instruct
