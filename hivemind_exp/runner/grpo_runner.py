@@ -77,7 +77,6 @@ class GRPORunner:
                 model_name, training_args, quantization
             )
         training_args.vllm_gpu_memory_utilization = self.peak_memory_percentage
-      def load_unsloth_model(model_name, quantization):
     if UNSLOTH_ENABLED:
         model = FastLanguageModel.from_pretrained(
             model_name,
