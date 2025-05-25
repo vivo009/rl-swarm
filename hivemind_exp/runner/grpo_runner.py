@@ -70,46 +70,40 @@ class GRPORunner:
         )
 
         quantization = parse_quantization(model_name)
-        if training_args.vllm_gpu_memory_utilization != 0.65: # Not default
+        if training_args.vllm_gpu_memory_utilization != 0.82: # Not default
             self.peak_memory_percentage = training_args.vllm_gpu_memory_utilization
         else:
             self.peak_memory_percentage=estimate_peak_mem_percentage(
                 model_name, training_args, quantization
             )
-        # Set vLLM GPU memory utilization to 21GB
-training_args.vllm_gpu_memory_utilization = 21 * 1024**3 / torch.cuda.get_device_properties(0).total_memory
+        training_args.vllm_gpu_memory_utilization = self.peak_memory_percentage
+      def load_unsloth_model(model_name, quantization):
+    if UNSLOTH_ENABLED:
+        model = FastLanguageModel.from_pretrained(
+            model_name,
+            max_seq_length=MAX_SEQ_LENGTH,
+            torch_dtype=torch.float16,
+            load_in_4bit=(quantization == Quantization._4BIT),
+            load_in_8bit=False,
+            use_flash_attention_2=True,  # If supported by your GPU + CUDA
+            use_exact_model_name=True,
+            fast_inference=True,
+            gpu_memory_utilization=0.82,  # Safely below 22GB for 3090
+        )[0]
 
-if UNSLOTH_ENABLED:
-    model = FastLanguageModel.from_pretrained(
-        model_name,
-        load_in_4bit=quantization == Quantization._4BIT,
-        load_in_8bit=False,
-        fast_inference=True,
-        use_exact_model_name=True,
-        max_seq_length=MAX_SEQ_LENGTH,
-        gpu_memory_utilization=training_args.vllm_gpu_memory_utilization,
-        **model_init_kwargs,
-    )
-            )[0]
-            return FastLanguageModel.get_peft_model(
-                model,
-                r=16,
-                target_modules=[
-                    "q_proj",
-                    "k_proj",
-                    "v_proj",
-                    "o_proj",
-                    "gate_proj",
-                    "up_proj",
-                    "down_proj",
-                ],
-                lora_alpha=16,
-                lora_dropout=0,  # Supports any, but = 0 is optimized
-                bias="none",  # Supports any, but = "none" is optimized
-                # [NEW] "unsloth" uses 30% less VRAM, fits 2x larger batch sizes!
-                use_gradient_checkpointing="unsloth",  # True or "unsloth" for very long context # type: ignore
-                random_state=123,
-            )
+        return FastLanguageModel.get_peft_model(
+            model,
+            r=16,
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj"
+            ],
+            lora_alpha=16,
+            lora_dropout=0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=123,
+        )
         else:
             return AutoModelForCausalLM.from_pretrained(
                 model_name,
