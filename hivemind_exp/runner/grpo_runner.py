@@ -40,6 +40,7 @@ logger = logging.getLogger(__name__)
 
 MAX_SEQ_LENGTH = 4096
 
+
 @dataclass
 class GRPOArguments:
     # Hivemind arguments
@@ -64,45 +65,46 @@ class GRPOArguments:
 class GRPORunner:
     def get_model(self, grpo_args: GRPOArguments, training_args: GRPOConfig, model_name: str):
         model_init_kwargs = training_args.model_init_kwargs or {}
-        # Disable caching if gradient checkpointing is enabled (not supported)
         model_init_kwargs["use_cache"] = (
             False if training_args.gradient_checkpointing else model_init_kwargs.get("use_cache")
         )
 
         quantization = parse_quantization(model_name)
-        if training_args.vllm_gpu_memory_utilization != 0.82: # Not default
+
+        if training_args.vllm_gpu_memory_utilization != 0.82:  # Not default
             self.peak_memory_percentage = training_args.vllm_gpu_memory_utilization
         else:
-            self.peak_memory_percentage=estimate_peak_mem_percentage(
+            self.peak_memory_percentage = estimate_peak_mem_percentage(
                 model_name, training_args, quantization
             )
         training_args.vllm_gpu_memory_utilization = self.peak_memory_percentage
-    if UNSLOTH_ENABLED:
-        model = FastLanguageModel.from_pretrained(
-            model_name,
-            max_seq_length=MAX_SEQ_LENGTH,
-            torch_dtype=torch.float16,
-            load_in_4bit=(quantization == Quantization._4BIT),
-            load_in_8bit=False,
-            use_flash_attention_2=True,  # If supported by your GPU + CUDA
-            use_exact_model_name=True,
-            fast_inference=True,
-            gpu_memory_utilization=0.82,  # Safely below 22GB for 3090
-        )[0]
 
-        return FastLanguageModel.get_peft_model(
-            model,
-            r=16,
-            target_modules=[
-                "q_proj", "k_proj", "v_proj", "o_proj",
-                "gate_proj", "up_proj", "down_proj"
-            ],
-            lora_alpha=16,
-            lora_dropout=0,
-            bias="none",
-            use_gradient_checkpointing="unsloth",
-            random_state=123,
-        )
+        if UNSLOTH_ENABLED:
+            model = FastLanguageModel.from_pretrained(
+                model_name,
+                max_seq_length=MAX_SEQ_LENGTH,
+                torch_dtype=torch.float16,
+                load_in_4bit=(quantization == Quantization._4BIT),
+                load_in_8bit=False,
+                use_flash_attention_2=True,
+                use_exact_model_name=True,
+                fast_inference=True,
+                gpu_memory_utilization=0.82,
+            )[0]
+
+            return FastLanguageModel.get_peft_model(
+                model,
+                r=16,
+                target_modules=[
+                    "q_proj", "k_proj", "v_proj", "o_proj",
+                    "gate_proj", "up_proj", "down_proj"
+                ],
+                lora_alpha=16,
+                lora_dropout=0,
+                bias="none",
+                use_gradient_checkpointing="unsloth",
+                random_state=123,
+            )
         else:
             return AutoModelForCausalLM.from_pretrained(
                 model_name,
@@ -209,7 +211,6 @@ class GRPORunner:
         else:
             node = HivemindNode.coordinator(model_name_or_path, str(dht.peer_id))
 
-        # TODO: Extract this and generalize.
         stage_data = gsm8k_stage_data(dht, node, train_dataset, test_dataset)
         stage_data.max_rounds = grpo_args.max_rounds
 
