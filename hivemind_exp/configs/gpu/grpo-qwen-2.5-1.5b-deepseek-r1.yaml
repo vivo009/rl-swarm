@@ -27,7 +27,7 @@ num_generations: 4
 beta: 0.001
 max_prompt_length: 128                # ↓ reduced from 256
 max_completion_length: 512            # ↓ reduced from 1024
-vllm_gpu_memory_utilization: 0.95      # ↓ override to prevent OOM
+vllm_gpu_memory_utilization: 0.85      # ↓ override to prevent OOM
 
 # Logging arguments
 logging_strategy: steps
