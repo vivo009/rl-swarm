@@ -76,17 +76,20 @@ class GRPORunner:
             self.peak_memory_percentage=estimate_peak_mem_percentage(
                 model_name, training_args, quantization
             )
-        training_args.vllm_gpu_memory_utilization = self.peak_memory_percentage
-        if UNSLOTH_ENABLED:
-            model = FastLanguageModel.from_pretrained(
-                model_name,
-                load_in_4bit=quantization == Quantization._4BIT,
-                load_in_8bit=False,
-                fast_inference=True,
-                use_exact_model_name=True,
-                max_seq_length=MAX_SEQ_LENGTH,
-                gpu_memory_utilization=self.peak_memory_percentage,
-                **model_init_kwargs,
+        # Set vLLM GPU memory utilization to 21GB
+training_args.vllm_gpu_memory_utilization = 21 * 1024**3 / torch.cuda.get_device_properties(0).total_memory
+
+if UNSLOTH_ENABLED:
+    model = FastLanguageModel.from_pretrained(
+        model_name,
+        load_in_4bit=quantization == Quantization._4BIT,
+        load_in_8bit=False,
+        fast_inference=True,
+        use_exact_model_name=True,
+        max_seq_length=MAX_SEQ_LENGTH,
+        gpu_memory_utilization=training_args.vllm_gpu_memory_utilization,
+        **model_init_kwargs,
+    )
             )[0]
             return FastLanguageModel.get_peft_model(
                 model,
